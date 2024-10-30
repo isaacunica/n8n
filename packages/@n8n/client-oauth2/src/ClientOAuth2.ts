@@ -38,11 +38,7 @@ export interface ClientOAuth2Options {
 }
 
 class ResponseError extends Error {
-	constructor(
-		readonly status: number,
-		readonly body: object,
-		readonly code = 'ESTATUS',
-	) {
+	constructor(readonly status: number, readonly body: object, readonly code = 'ESTATUS') {
 		super(`HTTP status ${status}`);
 	}
 }
@@ -110,18 +106,32 @@ export class ClientOAuth2 {
 			requestConfig.httpsAgent = sslIgnoringAgent;
 		}
 
-		const response = await axios.request(requestConfig);
+		const maxRetries = 10;
+		let attempts = 0;
 
-		const body = this.parseResponseBody<T>(response.data);
+		while (attempts <= maxRetries) {
+			const response = await axios.request(requestConfig);
+			const body = this.parseResponseBody<T>(response.data);
 
-		// eslint-disable-next-line @typescript-eslint/ban-ts-comment
-		// @ts-ignore
-		const authErr = getAuthError(body);
-		if (authErr) throw authErr;
+			// eslint-disable-next-line @typescript-eslint/ban-ts-comment
+			// @ts-ignore
+			const authErr = getAuthError(body);
+			if (authErr) throw authErr;
 
-		if (response.status < 200 || response.status >= 399)
-			throw new ResponseError(response.status, response.data);
-
-		return body;
+			// Verifica status 429 para retries
+			if (response.status === 429) {
+				const retryAfter = parseInt(response.headers['retry-after'], 10) || 2 ** attempts * 1000;
+				if (attempts === maxRetries) {
+					throw new ResponseError(response.status, response.data); // Excede o número de tentativas
+				}
+				await new Promise((resolve) => setTimeout(resolve, retryAfter)); // Espera o tempo definido
+				attempts++;
+			} else if (response.status >= 200 && response.status < 399) {
+				return body;
+			} else {
+				throw new ResponseError(response.status, response.data);
+			}
+		}
+		throw new ResponseError(429, { message: 'Max retries reached' });
 	}
 }
