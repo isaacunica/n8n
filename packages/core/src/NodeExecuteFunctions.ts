@@ -842,72 +842,89 @@ export async function proxyRequestToAxios(
 		console.log('requestFn 842');
 		requestFn = async () => await axios(axiosConfig);
 	}
+	const maxRetries = 10;
+	let attempt = 0;
 
-	try {
-		const response = await requestFn();
-		let body = response.data;
-		if (body instanceof IncomingMessage && axiosConfig.responseType === 'stream') {
-			parseIncomingMessage(body);
-		} else if (body === '') {
-			body = axiosConfig.responseType === 'arraybuffer' ? Buffer.alloc(0) : undefined;
-		}
-		await additionalData?.hooks?.executeHookFunctions('nodeFetchedData', [workflow?.id, node]);
-		return configObject.resolveWithFullResponse
-			? {
-					body,
-					headers: { ...response.headers },
-					statusCode: response.status,
-					statusMessage: response.statusText,
-					request: response.request,
-				}
-			: body;
-	} catch (error) {
-		const { config, response } = error;
+	while (attempt < maxRetries) {
+		try {
+			const response = await requestFn();
+			let body = response.data;
 
-		// Axios hydrates the original error with more data. We extract them.
-		// https://github.com/axios/axios/blob/master/lib/core/enhanceError.js
-		// Note: `code` is ignored as it's an expected part of the errorData.
-		if (error.isAxiosError) {
-			error.config = error.request = undefined;
-			error.options = pick(config ?? {}, ['url', 'method', 'data', 'headers']);
-			if (response) {
-				Logger.debug('Request proxied to Axios failed', { status: response.status });
-				let responseData = response.data;
-
-				if (Buffer.isBuffer(responseData) || responseData instanceof Readable) {
-					responseData = await binaryToString(responseData);
-				}
-
-				if (configObject.simple === false) {
-					if (configObject.resolveWithFullResponse) {
-						return {
-							body: responseData,
-							headers: response.headers,
-							statusCode: response.status,
-							statusMessage: response.statusText,
-						};
-					} else {
-						return responseData;
-					}
-				}
-
-				error.message = `${response.status as number} - ${JSON.stringify(responseData)}`;
-				throw Object.assign(error, {
-					statusCode: response.status,
-					/**
-					 * Axios adds `status` when serializing, causing `status` to be available only to the client.
-					 * Hence we add it explicitly to allow the backend to use it when resolving expressions.
-					 */
-					status: response.status,
-					error: responseData,
-					response: pick(response, ['headers', 'status', 'statusText']),
-				});
-			} else if ('rejectUnauthorized' in configObject && error.code?.includes('CERT')) {
-				throw new NodeSslError(error);
+			if (body instanceof IncomingMessage && axiosConfig.responseType === 'stream') {
+				parseIncomingMessage(body);
+			} else if (body === '') {
+				body = axiosConfig.responseType === 'arraybuffer' ? Buffer.alloc(0) : undefined;
 			}
-		}
 
-		throw error;
+			await additionalData?.hooks?.executeHookFunctions('nodeFetchedData', [workflow?.id, node]);
+			return configObject.resolveWithFullResponse
+				? {
+						body,
+						headers: { ...response.headers },
+						statusCode: response.status,
+						statusMessage: response.statusText,
+						request: response.request,
+					}
+				: body;
+		} catch (error) {
+			const { config, response } = error;
+
+			// Verifica se é erro 429 para retries
+			if (response?.status === 429) {
+				const retryAfter = response.headers['retry-after'];
+				const delay = retryAfter
+					? parseInt(retryAfter) * 1000 // Usa 'Retry-After' em segundos
+					: Math.pow(2, attempt) * 1000; // Atraso exponencial em milissegundos
+
+				attempt++;
+				console.warn(
+					`Tentativa ${attempt} de ${maxRetries} após erro 429. Retentando em ${delay / 1000} segundos.`,
+				);
+				await new Promise((resolve) => setTimeout(resolve, delay)); // Atraso antes de nova tentativa
+				continue;
+			}
+
+			// Lida com outros erros da requisição
+			if (error.isAxiosError) {
+				error.config = error.request = undefined;
+				error.options = pick(config ?? {}, ['url', 'method', 'data', 'headers']);
+
+				if (response) {
+					Logger.debug('Request proxied to Axios failed', { status: response.status });
+					let responseData = response.data;
+
+					if (Buffer.isBuffer(responseData) || responseData instanceof Readable) {
+						responseData = await binaryToString(responseData);
+					}
+
+					if (configObject.simple === false) {
+						if (configObject.resolveWithFullResponse) {
+							return {
+								body: responseData,
+								headers: response.headers,
+								statusCode: response.status,
+								statusMessage: response.statusText,
+							};
+						} else {
+							return responseData;
+						}
+					}
+
+					error.message = `${response.status} - ${JSON.stringify(responseData)}`;
+					throw Object.assign(error, {
+						statusCode: response.status,
+						status: response.status,
+						error: responseData,
+						response: pick(response, ['headers', 'status', 'statusText']),
+					});
+				} else if ('rejectUnauthorized' in configObject && error.code?.includes('CERT')) {
+					throw new NodeSslError(error);
+				}
+			}
+
+			// Lança o erro original se não for 429
+			throw error;
+		}
 	}
 }
 
