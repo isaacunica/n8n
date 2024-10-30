@@ -798,24 +798,48 @@ export async function proxyRequestToAxios(
 	let requestFn: () => AxiosPromise;
 	if (configObject.auth?.sendImmediately === false) {
 		// for digest-auth
-		requestFn = async () => {
-			try {
-				console.trace()
-				return await axios(axiosConfig);
-			} catch (error) {
-				const { response } = error;
-				if (response?.status !== 401 || !response.headers['www-authenticate']?.includes('nonce')) {
+		requestFn = async (): Promise<any> => {
+			const maxRetries = 10; // Define o número máximo de tentativas
+			let attempt = 0;
+
+			while (attempt < maxRetries) {
+				try {
+					console.log('requestFn');
+					return await axios(axiosConfig); // Primeira tentativa de requisição
+				} catch (error) {
+					const { response } = error;
+
+					// Verifica se o status é 429 para aplicar o retry
+					if (response?.status === 429) {
+						const retryAfter = response.headers['retry-after'];
+						const delay = retryAfter
+							? parseInt(retryAfter) * 1000 // Usa o valor de 'Retry-After' em segundos
+							: Math.pow(2, attempt) * 1000; // Atraso exponencial se 'Retry-After' não estiver disponível
+
+						attempt++;
+						console.warn(
+							`Tentativa ${attempt} de ${maxRetries}. Retentando em ${delay / 1000} segundos.`,
+						);
+						await new Promise((resolve) => setTimeout(resolve, delay)); // Espera o tempo antes de tentar novamente
+						continue;
+					}
+
+					// Lógica de autenticação em caso de erro 401 e cabeçalho 'www-authenticate' com 'nonce'
+					if (response?.status === 401 && response.headers['www-authenticate']?.includes('nonce')) {
+						const { auth } = axiosConfig;
+						delete axiosConfig.auth;
+						axiosConfig = digestAuthAxiosConfig(axiosConfig, response, auth);
+						console.log('response 832');
+						return await axios(axiosConfig);
+					}
+
+					// Lança o erro se não for um 429 ou não corresponder à lógica 401
 					throw error;
 				}
-				const { auth } = axiosConfig;
-				delete axiosConfig.auth;
-				axiosConfig = digestAuthAxiosConfig(axiosConfig, response, auth);
-				console.trace()
-				return await axios(axiosConfig);
 			}
 		};
 	} else {
-		console.trace()
+		console.log('requestFn 842');
 		requestFn = async () => await axios(axiosConfig);
 	}
 
@@ -1016,24 +1040,50 @@ async function httpRequest(
 		delete axiosRequest.data;
 	}
 
-	let result: AxiosResponse<any>;
-	try {
-		console.trace()
-		result = await axios(axiosRequest);
-	} catch (error) {
-		if (requestOptions.auth?.sendImmediately === false) {
+	let result: any;
+	const maxRetries = 10;
+	let attempt = 0;
+
+	while (attempt < maxRetries) {
+		try {
+			console.trace();
+			result = await axios(axiosRequest);
+			break; // Sucesso: sai do loop
+		} catch (error) {
 			const { response } = error;
-			if (response?.status !== 401 || !response.headers['www-authenticate']?.includes('nonce')) {
-				throw error;
+
+			// Lógica de retry para status 429
+			if (response?.status === 429) {
+				const retryAfter = response.headers['retry-after'];
+				const delay = retryAfter
+					? parseInt(retryAfter) * 1000 // Usa o valor de 'Retry-After' em segundos
+					: Math.pow(2, attempt) * 1000; // Atraso exponencial se 'Retry-After' não estiver disponível
+
+				attempt++;
+				console.warn(
+					`Tentativa ${attempt} de ${maxRetries}. Retentando em ${delay / 1000} segundos.`,
+				);
+				await new Promise((resolve) => setTimeout(resolve, delay)); // Atraso antes de tentar novamente
+				continue;
 			}
 
-			const { auth } = axiosRequest;
-			delete axiosRequest.auth;
-			axiosRequest = digestAuthAxiosConfig(axiosRequest, response, auth);
-			console.trace()
-			result = await axios(axiosRequest);
+			// Lógica de autenticação em caso de erro 401 e cabeçalho 'www-authenticate' com 'nonce'
+			if (
+				requestOptions.auth?.sendImmediately === false &&
+				response?.status === 401 &&
+				response.headers['www-authenticate']?.includes('nonce')
+			) {
+				const { auth } = axiosRequest;
+				delete axiosRequest.auth;
+				axiosRequest = digestAuthAxiosConfig(axiosRequest, response, auth);
+				console.log('requestFn 1079');
+				result = await axios(axiosRequest);
+				break; // Sucesso: sai do loop
+			}
+
+			// Lança o erro se não for um 429 ou 401 com a lógica de autenticação
+			throw error;
 		}
-		throw error;
 	}
 
 	if (requestOptions.returnFullResponse) {
