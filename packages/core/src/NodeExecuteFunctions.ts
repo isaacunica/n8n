@@ -804,7 +804,6 @@ export async function proxyRequestToAxios(
 
 			while (attempt < maxRetries) {
 				try {
-					console.log('requestFn');
 					return await axios(axiosConfig); // Primeira tentativa de requisição
 				} catch (error) {
 					const { response } = error;
@@ -829,7 +828,6 @@ export async function proxyRequestToAxios(
 						const { auth } = axiosConfig;
 						delete axiosConfig.auth;
 						axiosConfig = digestAuthAxiosConfig(axiosConfig, response, auth);
-						console.log('response 832');
 						return await axios(axiosConfig);
 					}
 
@@ -839,7 +837,6 @@ export async function proxyRequestToAxios(
 			}
 		};
 	} else {
-		console.log('requestFn 842');
 		requestFn = async () => await axios(axiosConfig);
 	}
 	const maxRetries = 10;
@@ -1093,7 +1090,6 @@ async function httpRequest(
 				const { auth } = axiosRequest;
 				delete axiosRequest.auth;
 				axiosRequest = digestAuthAxiosConfig(axiosRequest, response, auth);
-				console.log('requestFn 1079');
 				result = await axios(axiosRequest);
 				break; // Sucesso: sai do loop
 			}
