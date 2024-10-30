@@ -149,6 +149,7 @@ export class GoogleApi implements ICredentialType {
 			url: 'https://oauth2.googleapis.com/token',
 		};
 
+		console.trace();
 		const result = await axios(axiosRequestConfig);
 
 		const { access_token } = result.data;

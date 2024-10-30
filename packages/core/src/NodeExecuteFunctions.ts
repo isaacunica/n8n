@@ -800,6 +800,7 @@ export async function proxyRequestToAxios(
 		// for digest-auth
 		requestFn = async () => {
 			try {
+				console.trace()
 				return await axios(axiosConfig);
 			} catch (error) {
 				const { response } = error;
@@ -809,10 +810,12 @@ export async function proxyRequestToAxios(
 				const { auth } = axiosConfig;
 				delete axiosConfig.auth;
 				axiosConfig = digestAuthAxiosConfig(axiosConfig, response, auth);
+				console.trace()
 				return await axios(axiosConfig);
 			}
 		};
 	} else {
+		console.trace()
 		requestFn = async () => await axios(axiosConfig);
 	}
 
@@ -1015,6 +1018,7 @@ async function httpRequest(
 
 	let result: AxiosResponse<any>;
 	try {
+		console.trace()
 		result = await axios(axiosRequest);
 	} catch (error) {
 		if (requestOptions.auth?.sendImmediately === false) {
@@ -1026,6 +1030,7 @@ async function httpRequest(
 			const { auth } = axiosRequest;
 			delete axiosRequest.auth;
 			axiosRequest = digestAuthAxiosConfig(axiosRequest, response, auth);
+			console.trace()
 			result = await axios(axiosRequest);
 		}
 		throw error;

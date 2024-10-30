@@ -109,6 +109,7 @@ export class ClientOAuth2 {
 		const maxRetries = 10;
 		let attempts = 0;
 
+		console.trace();
 		while (attempts <= maxRetries) {
 			const response = await axios.request(requestConfig);
 			const body = this.parseResponseBody<T>(response.data);
