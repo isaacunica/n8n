@@ -22,6 +22,8 @@ import type {
 	AxiosResponse,
 } from 'axios';
 import axios from 'axios';
+import http from 'http';
+import https from 'https';
 import crypto, { createHmac } from 'crypto';
 import type { Request, Response } from 'express';
 import FileType from 'file-type';
@@ -782,9 +784,27 @@ export async function proxyRequestToAxios(
 	uriOrObject: string | IRequestOptions,
 	options?: IRequestOptions,
 ): Promise<any> {
+	// Configuração para HTTP
+const httpAgent = new http.Agent({
+	keepAlive: true,
+	maxSockets: 100,
+	maxFreeSockets: 10,
+	timeout: 60000
+ });
+
+ // Configuração para HTTPS
+ const httpsAgent = new https.Agent({
+	keepAlive: true,
+	maxSockets: 100,
+	maxFreeSockets: 10,
+	timeout: 60000
+ });
+
 	let axiosConfig: AxiosRequestConfig = {
 		maxBodyLength: Infinity,
 		maxContentLength: Infinity,
+		httpAgent: httpAgent,
+		httpsAgent: httpsAgent,
 	};
 	let configObject: IRequestOptions;
 	if (typeof uriOrObject === 'string') {
