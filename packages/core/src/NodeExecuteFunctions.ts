@@ -819,7 +819,7 @@ const httpAgent = new http.Agent({
 	if (configObject.auth?.sendImmediately === false) {
 		// for digest-auth
 		requestFn = async (): Promise<any> => {
-			const maxRetries = 10; // Define o número máximo de tentativas
+			const maxRetries = 100; // Define o número máximo de tentativas
 			let attempt = 0;
 
 			while (attempt < maxRetries) {
@@ -836,9 +836,7 @@ const httpAgent = new http.Agent({
 							: Math.pow(2, attempt) * 1000; // Atraso exponencial se 'Retry-After' não estiver disponível
 
 						attempt++;
-						console.warn(
-							`Tentativa ${attempt} de ${maxRetries}. Retentando em ${delay / 1000} segundos.`,
-						);
+
 						await new Promise((resolve) => setTimeout(resolve, delay)); // Espera o tempo antes de tentar novamente
 						continue;
 					}
@@ -859,7 +857,7 @@ const httpAgent = new http.Agent({
 	} else {
 		requestFn = async () => await axios(axiosConfig);
 	}
-	const maxRetries = 10;
+	const maxRetries = 50;
 	let attempt = 0;
 
 	while (attempt < maxRetries) {
@@ -894,9 +892,6 @@ const httpAgent = new http.Agent({
 					: Math.pow(2, attempt) * 1000; // Atraso exponencial em milissegundos
 
 				attempt++;
-				console.warn(
-					`Tentativa ${attempt} de ${maxRetries} após erro 429. Retentando em ${delay / 1000} segundos.`,
-				);
 				await new Promise((resolve) => setTimeout(resolve, delay)); // Atraso antes de nova tentativa
 				continue;
 			}
@@ -1075,12 +1070,11 @@ async function httpRequest(
 	}
 
 	let result: any;
-	const maxRetries = 10;
+	const maxRetries = 100;
 	let attempt = 0;
 
 	while (attempt < maxRetries) {
 		try {
-			console.trace();
 			result = await axios(axiosRequest);
 			break; // Sucesso: sai do loop
 		} catch (error) {
@@ -1094,9 +1088,6 @@ async function httpRequest(
 					: Math.pow(2, attempt) * 1000; // Atraso exponencial se 'Retry-After' não estiver disponível
 
 				attempt++;
-				console.warn(
-					`Tentativa ${attempt} de ${maxRetries}. Retentando em ${delay / 1000} segundos.`,
-				);
 				await new Promise((resolve) => setTimeout(resolve, delay)); // Atraso antes de tentar novamente
 				continue;
 			}
