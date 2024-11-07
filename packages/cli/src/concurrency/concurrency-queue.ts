@@ -17,6 +17,7 @@ export class ConcurrencyQueue extends TypedEmitter<ConcurrencyEvents> {
 
 	constructor(private capacity: number) {
 		super();
+		this.setMaxListeners(30)
 	}
 
 	async enqueue(executionId: string) {

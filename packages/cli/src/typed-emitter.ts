@@ -10,6 +10,14 @@ type Listener<Payload> = (payload: Payload) => void;
 export class TypedEmitter<ListenerMap extends Payloads<ListenerMap>> extends EventEmitter {
 	private debounceWait = 300; // milliseconds
 
+	/**
+	 *
+	 */
+	constructor() {
+		super();
+		this.setMaxListeners(30);
+	}
+
 	override on<EventName extends keyof ListenerMap & string>(
 		eventName: EventName,
 		listener: Listener<ListenerMap[EventName]>,

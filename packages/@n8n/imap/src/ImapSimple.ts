@@ -16,6 +16,7 @@ export class ImapSimple extends EventEmitter {
 	constructor(private readonly imap: Imap) {
 		super();
 
+		this.imap.setMaxListeners(30);
 		// pass most node-imap `Connection` events through 1:1
 		IMAP_EVENTS.forEach((event) => {
 			this.imap.on(event, this.emit.bind(this, event));

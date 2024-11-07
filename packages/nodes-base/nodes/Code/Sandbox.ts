@@ -43,6 +43,7 @@ export abstract class Sandbox extends EventEmitter {
 		protected helpers: IExecuteFunctions['helpers'],
 	) {
 		super();
+		this.setMaxListeners(30);
 	}
 
 	abstract runCode(): Promise<unknown>;

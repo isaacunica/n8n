@@ -76,6 +76,7 @@ export class MessageEventBus extends EventEmitter {
 		private readonly globalConfig: GlobalConfig,
 	) {
 		super();
+		this.setMaxListeners(30)
 	}
 
 	/**
