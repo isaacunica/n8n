@@ -36,6 +36,7 @@ export class WorkflowStatisticsService extends TypedEmitter<WorkflowStatisticsEv
 		private readonly userService: UserService,
 		private readonly eventService: EventService,
 	) {
+		// @ts-ignore
 		super({ captureRejections: true });
 		if ('SKIP_STATISTICS_EVENTS' in process.env) return;
 
